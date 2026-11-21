@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hypna">
+  <title>Hypna – Einschlaf-Erkennung</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Hypna</h1>
+    <p class="sub">Erkennt dein Einschlafen, spielt eine Frage ab und nimmt deine Antwort auf.</p>
+  </header>
+
+  <main>
+    <section class="card status">
+      <div class="phase" id="phase">Bereit</div>
+      <div class="phase-detail" id="phaseDetail">Tippe auf Start und halte das Handy locker in der Hand.</div>
+
+      <div class="meter" aria-hidden="true">
+        <div class="meter-fill" id="meterFill"></div>
+        <div class="meter-mark" id="meterMark"></div>
+      </div>
+
+      <dl class="stats">
+        <div><dt>Kippwinkel</dt><dd id="statAngle">–</dd></div>
+        <div><dt>Bewegung</dt><dd id="statActivity">–</dd></div>
+        <div><dt>Runde</dt><dd id="statCycle">–</dd></div>
+        <div><dt>Sensor</dt><dd id="statRate">–</dd></div>
+      </dl>
+
+      <div class="buttons">
+        <button id="btnStart" class="primary">Start</button>
+        <button id="btnStop" class="danger" hidden>Stopp</button>
+        <button id="btnNight" hidden>Nachtmodus</button>
+        <button id="btnTest" hidden>Test-Auslösung</button>
+      </div>
+      <p class="warn" id="warn" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>Audio</h2>
+      <div class="file-row" data-key="incubation">
+        <div class="file-label">
+          <strong>Inkubation</strong>
+          <small>Optional. Läuft vor dem Einschlafen, z. B. „Denk an …“.</small>
+        </div>
+        <div class="file-name" data-name>keine Datei</div>
+        <div class="file-actions">
+          <label class="btn">Wählen<input type="file" accept="audio/*" hidden data-input></label>
+          <button data-preview disabled>▶︎</button>
+          <button data-remove disabled>✕</button>
+        </div>
+      </div>
+      <div class="file-row" data-key="question">
+        <div class="file-label">
+          <strong>Frage</strong>
+          <small>Wird nach dem Einschlafen abgespielt. Danach läuft die Aufnahme.</small>
+        </div>
+        <div class="file-name" data-name>keine Datei</div>
+        <div class="file-actions">
+          <label class="btn">Wählen<input type="file" accept="audio/*" hidden data-input></label>
+          <button data-preview disabled>▶︎</button>
+          <button data-remove disabled>✕</button>
+        </div>
+      </div>
+      <label class="field">
+        <span>Frage als Text (wird vorgelesen, falls keine Datei gewählt)</span>
+        <input type="text" data-setting="questionText">
+      </label>
+      <label class="field">
+        <span>Lautstärke <output data-out="volume"></output></span>
+        <input type="range" min="0" max="1" step="0.05" data-setting="volume">
+      </label>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary><h2>Ablauf</h2></summary>
+        <label class="field"><span>Wartezeit nach Erkennung (s)</span>
+          <input type="number" min="0" max="600" step="5" data-setting="delaySec"></label>
+        <label class="field"><span>Aufnahmedauer nach der Frage (s)</span>
+          <input type="number" min="5" max="600" step="5" data-setting="recordSec"></label>
+        <label class="field"><span>Anzahl Runden</span>
+          <input type="number" min="1" max="20" step="1" data-setting="cycles"></label>
+        <label class="field"><span>Pause nach jeder Runde (s)</span>
+          <input type="number" min="0" max="600" step="5" data-setting="cooldownSec"></label>
+        <label class="field"><span>Sicherheits-Timer: auslösen nach X Minuten auch ohne Erkennung (0 = aus)</span>
+          <input type="number" min="0" max="60" step="1" data-setting="fallbackMin"></label>
+        <label class="check"><input type="checkbox" data-setting="repeatIncubation"> Inkubation in jeder Runde wiederholen</label>
+        <label class="check"><input type="checkbox" data-setting="cancelOnRegrip"> Abbrechen, wenn ich das Handy in der Wartezeit wieder richtig halte</label>
+        <label class="check"><input type="checkbox" data-setting="recordEnabled"> Antwort aufnehmen</label>
+        <label class="check"><input type="checkbox" data-setting="keepMicOpen"> Mikrofon die ganze Session offen halten (stabiler mit Bluetooth-Kopfhörern)</label>
+        <label class="check"><input type="checkbox" data-setting="autoNight"> Beim Start automatisch Nachtmodus</label>
+      </details>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary><h2>Erkennung</h2></summary>
+        <label class="field"><span>Kippwinkel für Auslösung <output data-out="tiltDeg"></output>°</span>
+          <input type="range" min="15" max="90" step="5" data-setting="tiltDeg"></label>
+        <label class="field"><span>So lange muss der Winkel überschritten sein (s)</span>
+          <input type="number" min="0.2" max="10" step="0.1" data-setting="tiltHoldSec"></label>
+        <label class="field"><span>Kalibrierung (s)</span>
+          <input type="number" min="2" max="20" step="1" data-setting="calibrationSec"></label>
+        <label class="field"><span>Nach dem Scharfschalten so lange nicht auslösen (s)</span>
+          <input type="number" min="0" max="600" step="5" data-setting="minArmedSec"></label>
+        <button id="btnReset" class="small">Standardwerte</button>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Aufnahmen</h2>
+      <div id="recordings"><p class="muted">Noch keine Aufnahmen.</p></div>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary><h2>Log</h2></summary>
+        <ol id="log" class="log"></ol>
+        <div class="buttons">
+          <button id="btnExportLog" class="small">Log exportieren</button>
+          <button id="btnClearLog" class="small">Log löschen</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary><h2>So benutzt du es</h2></summary>
+        <ol class="howto">
+          <li>Leg dich hin, Kopfhörer rein, Handy am Ladekabel.</li>
+          <li>Tippe auf <b>Start</b> und erlaube Bewegungssensor und Mikrofon.</li>
+          <li>Halte das Handy locker in der Hand, z. B. senkrecht, mit dem Unterarm aufgestützt. Während der Kalibrierung ruhig halten.</li>
+          <li>Wenn du eindöst, kippt das Handy. Nach der Wartezeit kommt die Frage, und deine Antwort wird aufgenommen.</li>
+          <li>Danach das Handy wieder in die Hand nehmen. Die App merkt das und startet die nächste Runde.</li>
+        </ol>
+        <p class="muted">Die App muss im Vordergrund bleiben: Bildschirm an (der Nachtmodus ist schwarz), nicht sperren, nicht in eine andere App wechseln. Alles bleibt lokal auf deinem Handy.</p>
+      </details>
+    </section>
+  </main>
+
+  <div id="night" class="night" hidden>
+    <div class="night-phase" id="nightPhase"></div>
+    <div class="night-hint">Lange drücken zum Verlassen</div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
