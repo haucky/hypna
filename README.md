@@ -25,7 +25,7 @@ Inkubation → Kalibrieren → Wachen ──(Handy kippt > 40° für 1,5 s)─�
  Handy aufnehmen & ruhig halten ◀── Pause ◀── Aufnahme (60 s) ◀── Frage abspielen
 ```
 
-Alle Zeiten und Schwellen lassen sich unter **Ablauf** und **Erkennung** einstellen. Mit **Test-Auslösung** kannst du den Ablauf ausprobieren, ohne einzuschlafen. Der **Sicherheits-Timer** löst nach X Minuten auch ohne Erkennung aus.
+Vor der Frage spielt standardmäßig ein sanfter Glockenton, danach wird die Frage langsam eingeblendet (beides abschaltbar unter **Audio**). Alle Zeiten und Schwellen lassen sich unter **Ablauf** und **Erkennung** einstellen. Mit **Test-Auslösung** kannst du den Ablauf ausprobieren, ohne einzuschlafen. Der **Sicherheits-Timer** löst nach X Minuten auch ohne Erkennung aus.
 
 ## Wichtige Einschränkungen
 

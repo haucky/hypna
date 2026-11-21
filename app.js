@@ -19,6 +19,10 @@ const DEFAULT_SETTINGS = {
   recordEnabled: true,
   keepMicOpen: true,
   autoNight: true,
+  chime: true,
+  chimeGapSec: 3,
+  fadeInSec: 2,
+  repeatQuestion: false,
   volume: 0.8,
   questionText: 'Was geht dir gerade durch den Kopf?',
 };
@@ -196,13 +200,20 @@ async function decodeFile(key) {
   });
 }
 
-function playBuffer(key) {
+function playBuffer(key, { fadeInSec = 0 } = {}) {
   const buf = S.buffers[key];
   if (!buf || !S.ctx) return Promise.resolve(false);
   return new Promise((resolve) => {
     const src = S.ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(S.gain);
+    const g = S.ctx.createGain();
+    const t0 = S.ctx.currentTime;
+    if (fadeInSec > 0) {
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(1, t0 + fadeInSec);
+    }
+    src.connect(g);
+    g.connect(S.gain);
     src.onended = () => {
       if (S.currentSource === src) S.currentSource = null;
       resolve(true);
@@ -231,9 +242,66 @@ function speak(text) {
   });
 }
 
-async function playQuestion() {
-  if (S.buffers.question) return playBuffer('question');
-  return speak(settings.questionText);
+// Sanfter Glockenton, synthetisiert: weckt behutsamer als eine plötzliche Stimme
+function playChime() {
+  if (!S.ctx) return Promise.resolve();
+  const t0 = S.ctx.currentTime + 0.05;
+  const dur = 3;
+  const out = S.ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t0);
+  out.gain.exponentialRampToValueAtTime(0.35, t0 + 0.04);
+  out.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  out.connect(S.gain);
+  [[523.25, 1], [1046.5, 0.35], [1568, 0.12]].forEach(([f, a]) => {
+    const o = S.ctx.createOscillator();
+    const og = S.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = f;
+    og.gain.value = a;
+    o.connect(og);
+    og.connect(out);
+    o.start(t0);
+    o.stop(t0 + dur + 0.1);
+  });
+  return later((dur + 0.1) * 1000);
+}
+
+async function playQuestion(token) {
+  if (settings.chime) {
+    await playChime();
+    if (token !== S.token) return;
+    await later(settings.chimeGapSec * 1000);
+    if (token !== S.token) return;
+  }
+  const times = settings.repeatQuestion ? 2 : 1;
+  for (let i = 0; i < times; i++) {
+    if (i > 0) {
+      await later(4000);
+      if (token !== S.token) return;
+    }
+    if (S.buffers.question) await playBuffer('question', { fadeInSec: i === 0 ? settings.fadeInSec : 0 });
+    else await speak(settings.questionText);
+    if (token !== S.token) return;
+  }
+}
+
+// Prüft beim Auswählen, ob der Browser das Format abspielen kann
+async function canDecode(blob) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return true;
+  const ctx = new Ctx();
+  try {
+    const data = await blob.arrayBuffer();
+    await new Promise((resolve, reject) => {
+      const p = ctx.decodeAudioData(data, resolve, reject);
+      if (p && p.then) p.then(resolve, reject);
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    ctx.close().catch(() => {});
+  }
 }
 
 function unlockAudio() {
@@ -451,7 +519,7 @@ async function runPrompt(token) {
   } catch (e) {
     log(`Aufnahme konnte nicht starten: ${e.message}`);
   }
-  await playQuestion();
+  await playQuestion(token);
   if (token !== S.token) return;
   S.phaseEndsAt = now() + settings.recordSec;
   await later(settings.recordSec * 1000);
@@ -745,6 +813,12 @@ function bindFiles() {
     $('[data-input]', row).addEventListener('change', async (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+      if (!(await canDecode(file))) {
+        e.target.value = '';
+        showWarn(`„${file.name}“ kann dieser Browser nicht abspielen. Bitte als MP3, M4A oder WAV exportieren.`);
+        return;
+      }
+      hideWarn();
       await db.putFile(key, { name: file.name, type: file.type, blob: file });
       e.target.value = '';
       refreshFileRow(row);

@@ -55,7 +55,7 @@
         </div>
         <div class="file-name" data-name>keine Datei</div>
         <div class="file-actions">
-          <label class="btn">Wählen<input type="file" accept="audio/*" hidden data-input></label>
+          <label class="btn">Wählen<input type="file" accept="audio/*,.opus,.ogg,.oga,.webm,.m4a,.mp3,.wav,.flac,.aac" hidden data-input></label>
           <button data-preview disabled>▶︎</button>
           <button data-remove disabled>✕</button>
         </div>
@@ -67,7 +67,7 @@
         </div>
         <div class="file-name" data-name>keine Datei</div>
         <div class="file-actions">
-          <label class="btn">Wählen<input type="file" accept="audio/*" hidden data-input></label>
+          <label class="btn">Wählen<input type="file" accept="audio/*,.opus,.ogg,.oga,.webm,.m4a,.mp3,.wav,.flac,.aac" hidden data-input></label>
           <button data-preview disabled>▶︎</button>
           <button data-remove disabled>✕</button>
         </div>
@@ -76,6 +76,12 @@
         <span>Frage als Text (wird vorgelesen, falls keine Datei gewählt)</span>
         <input type="text" data-setting="questionText">
       </label>
+      <label class="check"><input type="checkbox" data-setting="chime"> Sanfter Glockenton vor der Frage</label>
+      <label class="field"><span>Pause zwischen Ton und Frage (s)</span>
+        <input type="number" min="0" max="30" step="1" data-setting="chimeGapSec"></label>
+      <label class="field"><span>Frage langsam einblenden (s, nur bei Datei)</span>
+        <input type="number" min="0" max="10" step="0.5" data-setting="fadeInSec"></label>
+      <label class="check"><input type="checkbox" data-setting="repeatQuestion"> Frage nach 4 s wiederholen</label>
       <label class="field">
         <span>Lautstärke <output data-out="volume"></output></span>
         <input type="range" min="0" max="1" step="0.05" data-setting="volume">
