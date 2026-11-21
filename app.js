@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = {
   cancelOnRegrip: true,
   recordEnabled: true,
   keepMicOpen: true,
-  autoNight: false,
+  autoNight: true,
   volume: 0.8,
   questionText: 'Was geht dir gerade durch den Kopf?',
 };
@@ -664,25 +664,66 @@ function uiTick() {
   renderStatus();
 }
 
-// Nachtmodus: schwarzer Bildschirm, Verlassen per langem Druck
-let pressTimer = null;
+// Sperre / Nachtmodus: schwarzer Bildschirm, der alle Berührungen schluckt.
+// Ruhende Finger (z. B. das Handy zwischen Zeige- und Mittelfinger) lösen nichts aus.
+// Entsperren nur, wenn ein Finger IM Startpunkt aufsetzt und bis in den Zielkreis zieht.
 function showNight(on) {
   $('#night').hidden = !on;
+  resetKnob();
 }
+
+let drag = null; // { id, x0, y0 }
+
+function resetKnob() {
+  const knob = $('#unlockKnob');
+  knob.style.transform = 'translate(0, 0)';
+  knob.classList.remove('dragging');
+  $('#unlockTarget').classList.remove('hit');
+  drag = null;
+}
+
+function inside(rect, x, y, pad = 0) {
+  return x >= rect.left - pad && x <= rect.right + pad && y >= rect.top - pad && y <= rect.bottom + pad;
+}
+
 function bindNight() {
   const el = $('#night');
-  const start = (e) => {
+  const knob = $('#unlockKnob');
+  const target = $('#unlockTarget');
+  const swallow = (e) => e.preventDefault();
+
+  el.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    clearTimeout(pressTimer);
-    pressTimer = setTimeout(() => showNight(false), 1200);
+    if (drag) return; // es zieht schon ein Finger
+    if (!inside(knob.getBoundingClientRect(), e.clientX, e.clientY, 12)) return;
+    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
+    knob.classList.add('dragging');
+    try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    e.preventDefault();
+    if (!drag || e.pointerId !== drag.id) return;
+    knob.style.transform = `translate(${e.clientX - drag.x0}px, ${e.clientY - drag.y0}px)`;
+    target.classList.toggle('hit', inside(target.getBoundingClientRect(), e.clientX, e.clientY));
+  });
+
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const ok = e.type === 'pointerup' && inside(target.getBoundingClientRect(), e.clientX, e.clientY);
+    resetKnob();
+    if (ok) {
+      showNight(false);
+      log('Entsperrt');
+    }
   };
-  const cancel = () => clearTimeout(pressTimer);
-  el.addEventListener('touchstart', start, { passive: false });
-  el.addEventListener('touchend', cancel);
-  el.addEventListener('touchcancel', cancel);
-  el.addEventListener('mousedown', start);
-  el.addEventListener('mouseup', cancel);
-  el.addEventListener('contextmenu', (e) => e.preventDefault());
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+
+  // Alles andere schlucken: kein Scrollen, Zoomen, Kontextmenü, Doppeltipp
+  ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'dblclick', 'contextmenu'].forEach((t) =>
+    el.addEventListener(t, swallow, { passive: false })
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -819,7 +860,10 @@ function init() {
     await finishSession('Session gestoppt');
     setPhase('idle');
   });
-  $('#btnNight').addEventListener('click', () => showNight(true));
+  $('#btnNight').addEventListener('click', () => {
+    showNight(true);
+    log('Gesperrt');
+  });
   $('#btnTest').addEventListener('click', () => {
     if (['armed', 'waitHand', 'calibrating'].includes(S.phase)) onTrigger('Test');
     else showWarn('Test geht nur, während die App wacht.');

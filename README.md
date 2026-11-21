@@ -29,7 +29,7 @@ Alle Zeiten und Schwellen lassen sich unter **Ablauf** und **Erkennung** einstel
 
 ## Wichtige Einschränkungen
 
-- **Die App muss im Vordergrund und der Bildschirm an bleiben.** Browser pausieren Sensoren, sobald das Display gesperrt ist. Die App hält den Bildschirm über die Wake Lock API wach. Der **Nachtmodus** macht ihn schwarz; mit einem langen Druck verlässt du ihn wieder.
+- **Die App muss im Vordergrund und der Bildschirm an bleiben.** Browser pausieren Sensoren, sobald das Display gesperrt ist. Die App hält den Bildschirm über die Wake Lock API wach. Die **Sperre** macht ihn schwarz und schluckt alle Berührungen. Entsperren: den Punkt unten links in den Kreis oben rechts ziehen.
 - **iOS:** Bewegungssensor und Wake Lock brauchen iOS 16.4 oder neuer. Die Berechtigung für den Bewegungssensor fragt Safari beim Start ab.
 - **Bluetooth-Kopfhörer:** Sobald das Mikrofon offen ist, schalten viele Handys Bluetooth-Kopfhörer in den Headset-Modus. Die Tonqualität sinkt dann, und oft nimmt das Mikrofon der Kopfhörer auf statt das des Handys. Deshalb ist „Mikrofon die ganze Session offen halten“ standardmäßig an: So wechselt das Profil nicht mitten in der Nacht.
 - **Ohne Kopfhörer** kann iOS bei offenem Mikrofon über die Hörmuschel statt über den Lautsprecher abspielen.

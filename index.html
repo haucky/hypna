@@ -40,7 +40,7 @@
       <div class="buttons">
         <button id="btnStart" class="primary">Start</button>
         <button id="btnStop" class="danger" hidden>Stopp</button>
-        <button id="btnNight" hidden>Nachtmodus</button>
+        <button id="btnNight" hidden>Sperren</button>
         <button id="btnTest" hidden>Test-Auslösung</button>
       </div>
       <p class="warn" id="warn" hidden></p>
@@ -99,7 +99,7 @@
         <label class="check"><input type="checkbox" data-setting="cancelOnRegrip"> Abbrechen, wenn ich das Handy in der Wartezeit wieder richtig halte</label>
         <label class="check"><input type="checkbox" data-setting="recordEnabled"> Antwort aufnehmen</label>
         <label class="check"><input type="checkbox" data-setting="keepMicOpen"> Mikrofon die ganze Session offen halten (stabiler mit Bluetooth-Kopfhörern)</label>
-        <label class="check"><input type="checkbox" data-setting="autoNight"> Beim Start automatisch Nachtmodus</label>
+        <label class="check"><input type="checkbox" data-setting="autoNight"> Beim Start automatisch sperren (schwarzer Bildschirm, Touch aus)</label>
       </details>
     </section>
 
@@ -144,14 +144,16 @@
           <li>Wenn du eindöst, kippt das Handy. Nach der Wartezeit kommt die Frage, und deine Antwort wird aufgenommen.</li>
           <li>Danach das Handy wieder in die Hand nehmen. Die App merkt das und startet die nächste Runde.</li>
         </ol>
-        <p class="muted">Die App muss im Vordergrund bleiben: Bildschirm an (der Nachtmodus ist schwarz), nicht sperren, nicht in eine andere App wechseln. Alles bleibt lokal auf deinem Handy.</p>
+        <p class="muted">Die App muss im Vordergrund bleiben: Bildschirm an (die Sperre ist schwarz und ignoriert Berührungen; entsperren durch Ziehen des Punkts unten links in den Kreis oben rechts), nicht sperren, nicht in eine andere App wechseln. Alles bleibt lokal auf deinem Handy.</p>
       </details>
     </section>
   </main>
 
   <div id="night" class="night" hidden>
     <div class="night-phase" id="nightPhase"></div>
-    <div class="night-hint">Lange drücken zum Verlassen</div>
+    <div class="night-hint">Gesperrt · Punkt unten links in den Kreis oben rechts ziehen</div>
+    <div class="unlock-target" id="unlockTarget"></div>
+    <div class="unlock-knob" id="unlockKnob"></div>
   </div>
 
   <script type="module" src="app.js"></script>

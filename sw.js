@@ -1,6 +1,6 @@
 // Service Worker: macht die App offline-fähig und installierbar.
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = 'hypna-v1';
+const CACHE = 'hypna-v2';
 const ASSETS = [
   './',
   './index.html',
