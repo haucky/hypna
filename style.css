@@ -219,3 +219,46 @@ button.small { padding: 6px 10px; min-height: 34px; font-size: 14px; }
 }
 .unlock-knob.dragging { background: #4a1818; }
 .unlock-target.hit { border-color: #8a2a2a; }
+
+/* Audiotagebuch */
+.meter-mark.floor { background: var(--muted); opacity: 0.5; }
+textarea {
+  width: 100%;
+  background: #0f0f18;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+select {
+  width: 100%;
+  background: #0f0f18;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+}
+.row { display: flex; gap: 12px; }
+.row .grow { flex: 1; min-width: 0; }
+.card .buttons { margin-top: 12px; }
+.progress {
+  height: 8px;
+  background: #0f0f18;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.progress-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.prompt-list { padding-left: 22px; margin: 8px 0 0; }
+.prompt-list li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.prompt-list li:last-child { border-bottom: 0; }
+.prompt-item { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.prompt-item span { flex: 1; }
+.prompt-item .tag { color: var(--muted); font-size: 12px; flex: none; }
+.prompt-item button { min-height: 34px; padding: 4px 10px; flex: none; }
+.stale { color: var(--warn); }

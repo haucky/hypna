@@ -1,7 +1,7 @@
 {
-  "name": "Hypna – Einschlaf-Erkennung",
+  "name": "Hypna – Audiotagebuch",
   "short_name": "Hypna",
-  "description": "Erkennt das Einschlafen über den Bewegungssensor, spielt eine Frage ab und nimmt die Antwort auf.",
+  "description": "Audiotagebuch für den Halbschlaf: nimmt auf, wenn du sprichst, entfernt Stille und fragt nach, wenn es lange still ist.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

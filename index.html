@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hypna">
-  <title>Hypna – Einschlaf-Erkennung</title>
+  <title>Hypna – Audiotagebuch</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -17,109 +17,82 @@
 <body>
   <header>
     <h1>Hypna</h1>
-    <p class="sub">Erkennt dein Einschlafen, spielt eine Frage ab und nimmt deine Antwort auf.</p>
+    <p class="sub">Audiotagebuch für den Halbschlaf. Nimmt auf, wenn du sprichst, und fragt nach, wenn es lange still ist.</p>
   </header>
 
   <main>
     <section class="card status">
       <div class="phase" id="phase">Bereit</div>
-      <div class="phase-detail" id="phaseDetail">Tippe auf Start und halte das Handy locker in der Hand.</div>
+      <div class="phase-detail" id="phaseDetail">Tippe auf Start, leg dich hin und sprich, wann immer etwas auftaucht.</div>
 
       <div class="meter" aria-hidden="true">
         <div class="meter-fill" id="meterFill"></div>
-        <div class="meter-mark" id="meterMark"></div>
+        <div class="meter-mark floor" id="meterFloor"></div>
+        <div class="meter-mark" id="meterThresh"></div>
       </div>
 
       <dl class="stats">
-        <div><dt>Kippwinkel</dt><dd id="statAngle">–</dd></div>
-        <div><dt>Bewegung</dt><dd id="statActivity">–</dd></div>
-        <div><dt>Runde</dt><dd id="statCycle">–</dd></div>
-        <div><dt>Sensor</dt><dd id="statRate">–</dd></div>
+        <div><dt>Läuft</dt><dd id="statElapsed">–</dd></div>
+        <div><dt>Gesprochen</dt><dd id="statSpoken">–</dd></div>
+        <div><dt>Nachfragen</dt><dd id="statPrompts">–</dd></div>
+        <div><dt>Nächste in</dt><dd id="statNext">–</dd></div>
       </dl>
 
       <div class="buttons">
         <button id="btnStart" class="primary">Start</button>
-        <button id="btnStop" class="danger" hidden>Stopp</button>
-        <button id="btnNight" hidden>Sperren</button>
-        <button id="btnTest" hidden>Test-Auslösung</button>
+        <button id="btnStop" class="danger" hidden>Stopp &amp; speichern</button>
+        <button id="btnLock" hidden>Sperren</button>
+        <button id="btnAsk" hidden>Jetzt nachfragen</button>
       </div>
       <p class="warn" id="warn" hidden></p>
     </section>
 
     <section class="card">
-      <h2>Audio</h2>
-      <div class="file-row" data-key="incubation">
-        <div class="file-label">
-          <strong>Inkubation</strong>
-          <small>Optional. Läuft vor dem Einschlafen, z. B. „Denk an …“.</small>
-        </div>
-        <div class="file-name" data-name>keine Datei</div>
-        <div class="file-actions">
-          <label class="btn">Wählen<input type="file" accept="audio/*,.opus,.ogg,.oga,.webm,.m4a,.mp3,.wav,.flac,.aac" hidden data-input></label>
-          <button data-preview disabled>▶︎</button>
-          <button data-remove disabled>✕</button>
-        </div>
-      </div>
-      <div class="file-row" data-key="question">
-        <div class="file-label">
-          <strong>Frage</strong>
-          <small>Wird nach dem Einschlafen abgespielt. Danach läuft die Aufnahme.</small>
-        </div>
-        <div class="file-name" data-name>keine Datei</div>
-        <div class="file-actions">
-          <label class="btn">Wählen<input type="file" accept="audio/*,.opus,.ogg,.oga,.webm,.m4a,.mp3,.wav,.flac,.aac" hidden data-input></label>
-          <button data-preview disabled>▶︎</button>
-          <button data-remove disabled>✕</button>
-        </div>
-      </div>
+      <h2>Nachfragen</h2>
+      <p class="muted">Eine Frage pro Zeile. Sie werden einmal mit Kyutai Pocket TTS auf deinem Handy vertont und dann gespeichert.</p>
       <label class="field">
-        <span>Frage als Text (wird vorgelesen, falls keine Datei gewählt)</span>
-        <input type="text" data-setting="questionText">
+        <textarea id="promptTexts" rows="7" spellcheck="false"></textarea>
       </label>
-      <label class="check"><input type="checkbox" data-setting="chime"> Sanfter Glockenton vor der Frage</label>
-      <label class="field"><span>Pause zwischen Ton und Frage (s)</span>
-        <input type="number" min="0" max="30" step="1" data-setting="chimeGapSec"></label>
-      <label class="field"><span>Frage langsam einblenden (s, nur bei Datei)</span>
-        <input type="number" min="0" max="10" step="0.5" data-setting="fadeInSec"></label>
-      <label class="check"><input type="checkbox" data-setting="repeatQuestion"> Frage nach 4 s wiederholen</label>
-      <label class="field">
-        <span>Lautstärke <output data-out="volume"></output></span>
-        <input type="range" min="0" max="1" step="0.05" data-setting="volume">
-      </label>
+      <div class="row">
+        <label class="field grow"><span>Stimme</span>
+          <select id="voiceSelect"><option value="">Standard (juergen)</option></select>
+        </label>
+        <label class="field grow"><span>Lebendigkeit <output id="tempOut"></output></span>
+          <input type="range" id="tempRange" min="0.1" max="1" step="0.05">
+        </label>
+      </div>
+      <div class="buttons">
+        <button id="btnGenerate" class="primary">Nachfragen vertonen</button>
+        <button id="btnTry">Probe hören</button>
+      </div>
+      <div class="progress" id="ttsProgress" hidden><div class="progress-fill" id="ttsProgressFill"></div></div>
+      <p class="muted" id="ttsStatus"></p>
+      <ol class="prompt-list" id="promptList"></ol>
     </section>
 
     <section class="card">
       <details>
-        <summary><h2>Ablauf</h2></summary>
-        <label class="field"><span>Wartezeit nach Erkennung (s)</span>
-          <input type="number" min="0" max="600" step="5" data-setting="delaySec"></label>
-        <label class="field"><span>Aufnahmedauer nach der Frage (s)</span>
-          <input type="number" min="5" max="600" step="5" data-setting="recordSec"></label>
-        <label class="field"><span>Anzahl Runden</span>
-          <input type="number" min="1" max="20" step="1" data-setting="cycles"></label>
-        <label class="field"><span>Pause nach jeder Runde (s)</span>
-          <input type="number" min="0" max="600" step="5" data-setting="cooldownSec"></label>
-        <label class="field"><span>Sicherheits-Timer: auslösen nach X Minuten auch ohne Erkennung (0 = aus)</span>
-          <input type="number" min="0" max="60" step="1" data-setting="fallbackMin"></label>
-        <label class="check"><input type="checkbox" data-setting="repeatIncubation"> Inkubation in jeder Runde wiederholen</label>
-        <label class="check"><input type="checkbox" data-setting="cancelOnRegrip"> Abbrechen, wenn ich das Handy in der Wartezeit wieder richtig halte</label>
-        <label class="check"><input type="checkbox" data-setting="recordEnabled"> Antwort aufnehmen</label>
-        <label class="check"><input type="checkbox" data-setting="keepMicOpen"> Mikrofon die ganze Session offen halten (stabiler mit Bluetooth-Kopfhörern)</label>
-        <label class="check"><input type="checkbox" data-setting="autoNight"> Beim Start automatisch sperren (schwarzer Bildschirm, Touch aus)</label>
-      </details>
-    </section>
-
-    <section class="card">
-      <details>
-        <summary><h2>Erkennung</h2></summary>
-        <label class="field"><span>Kippwinkel für Auslösung <output data-out="tiltDeg"></output>°</span>
-          <input type="range" min="15" max="90" step="5" data-setting="tiltDeg"></label>
-        <label class="field"><span>So lange muss der Winkel überschritten sein (s)</span>
-          <input type="number" min="0.2" max="10" step="0.1" data-setting="tiltHoldSec"></label>
-        <label class="field"><span>Kalibrierung (s)</span>
-          <input type="number" min="2" max="20" step="1" data-setting="calibrationSec"></label>
-        <label class="field"><span>Nach dem Scharfschalten so lange nicht auslösen (s)</span>
-          <input type="number" min="0" max="600" step="5" data-setting="minArmedSec"></label>
+        <summary><h2>Einstellungen</h2></summary>
+        <label class="field"><span>Stille entfernen, wenn länger als (s)</span>
+          <input type="number" min="1" max="60" step="1" data-setting="maxSilenceSec"></label>
+        <label class="field"><span>Nachfragen nach so viel Stille (min, 0 = nie)</span>
+          <input type="number" min="0" max="120" step="0.5" data-setting="promptAfterMin"></label>
+        <label class="field"><span>Höchstens so viele Nachfragen pro Session (0 = unbegrenzt)</span>
+          <input type="number" min="0" max="100" step="1" data-setting="maxPrompts"></label>
+        <label class="field"><span>Reihenfolge</span>
+          <select data-setting="promptOrder">
+            <option value="sequence">der Reihe nach</option>
+            <option value="random">zufällig</option>
+          </select></label>
+        <label class="field"><span>Empfindlichkeit: Sprache ab <output data-out="sensitivityDb"></output> dB über dem Grundrauschen</span>
+          <input type="range" min="4" max="30" step="1" data-setting="sensitivityDb"></label>
+        <label class="check"><input type="checkbox" data-setting="chime"> Sanfter Glockenton vor der Nachfrage</label>
+        <label class="field"><span>Pause zwischen Ton und Frage (s)</span>
+          <input type="number" min="0" max="30" step="1" data-setting="chimeGapSec"></label>
+        <label class="check"><input type="checkbox" data-setting="insertPrompts"> Nachfragen in die Aufnahme einfügen (beim Anhören hörst du, worauf du antwortest)</label>
+        <label class="check"><input type="checkbox" data-setting="autoLock"> Beim Start sperren (schwarzer Bildschirm, Touch aus)</label>
+        <label class="field"><span>Lautstärke <output data-out="volume"></output></span>
+          <input type="range" min="0" max="1" step="0.05" data-setting="volume"></label>
         <button id="btnReset" class="small">Standardwerte</button>
       </details>
     </section>
@@ -144,13 +117,13 @@
       <details>
         <summary><h2>So benutzt du es</h2></summary>
         <ol class="howto">
-          <li>Leg dich hin, Kopfhörer rein, Handy am Ladekabel.</li>
-          <li>Tippe auf <b>Start</b> und erlaube Bewegungssensor und Mikrofon.</li>
-          <li>Halte das Handy locker in der Hand, z. B. senkrecht, mit dem Unterarm aufgestützt. Während der Kalibrierung ruhig halten.</li>
-          <li>Wenn du eindöst, kippt das Handy. Nach der Wartezeit kommt die Frage, und deine Antwort wird aufgenommen.</li>
-          <li>Danach das Handy wieder in die Hand nehmen. Die App merkt das und startet die nächste Runde.</li>
+          <li>Einmalig: Nachfragen eintragen und auf <b>Nachfragen vertonen</b> tippen. Beim ersten Mal lädt das Handy das Sprachmodell (rund 180 MB, am besten im WLAN).</li>
+          <li>Kopfhörer rein, Handy ans Ladekabel, hinlegen, <b>Start</b>.</li>
+          <li>Sprich einfach, wann immer etwas auftaucht. Lange Stille wird herausgeschnitten.</li>
+          <li>Sagst du lange nichts, kommt leise eine Nachfrage.</li>
+          <li>Zum Beenden entsperren (Punkt unten links in den Kreis oben rechts ziehen) und <b>Stopp &amp; speichern</b>.</li>
         </ol>
-        <p class="muted">Die App muss im Vordergrund bleiben: Bildschirm an (die Sperre ist schwarz und ignoriert Berührungen; entsperren durch Ziehen des Punkts unten links in den Kreis oben rechts), nicht sperren, nicht in eine andere App wechseln. Alles bleibt lokal auf deinem Handy.</p>
+        <p class="muted">Die App muss im Vordergrund bleiben, der Bildschirm bleibt an (schwarz). Alles bleibt lokal auf deinem Handy. Bricht eine Session ab, wird sie beim nächsten Öffnen wiederhergestellt.</p>
       </details>
     </section>
   </main>

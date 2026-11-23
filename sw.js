@@ -1,18 +1,21 @@
 // Service Worker: macht die App offline-fähig und installierbar.
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = 'hypna-v3';
+const CACHE = 'hypna-v4';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './detector.js',
+  './audio-core.js',
+  './capture-worklet.js',
   './db.js',
+  './tts.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];
+// vendor/ (Pocket TTS, ~15 MB onnxruntime) wird erst beim ersten Vertonen geladen und dann zwischengespeichert
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
