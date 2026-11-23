@@ -1,63 +1,75 @@
-# Hypna
+# Hypna – Audiotagebuch für den Halbschlaf
 
-Eine kleine Progressive Web App für Experimente mit der Hypnagogie, also dem Zustand kurz vor dem Einschlafen. Die Idee stammt von Edisons Stahlkugel und dem Dormio-Projekt des MIT Media Lab.
+Eine Progressive Web App für das Einschlafen und Aufwachen. Du legst dich hin, tippst auf Start und sprichst, wann immer etwas auftaucht.
 
-Du hältst das Handy locker in der Hand. Wenn du eindöst, erschlafft die Hand und das Handy kippt. Die App erkennt das über den Bewegungssensor, wartet kurz, spielt eine Frage ab und nimmt gleichzeitig deine Antwort auf. Danach nimmst du das Handy wieder in die Hand, und die nächste Runde beginnt.
+- **Nimmt nur auf, wenn du sprichst.** Stille, die länger als 5 Sekunden dauert, wird herausgeschnitten. Kürzere Pausen bleiben erhalten.
+- **Fragt nach, wenn es lange still ist.** Nach 5 Minuten ohne Sprechen kommt leise eine Frage, etwa „Was ist gerade da?“. Danach hört die App weiter zu.
+- **Die Fragen spricht Kyutai Pocket TTS**, direkt auf dem Handy und auf Deutsch. Vertont wird einmal, danach liegen die Audios lokal gespeichert vor.
+- **Eine Aufnahme pro Session** als WAV. Die Nachfragen sind mit eingefügt, damit du beim Anhören weißt, worauf du geantwortet hast.
 
-Es gibt keinen Server, keine Transkription und keine Cloud. Audiodateien, Aufnahmen und Log bleiben in der IndexedDB deines Browsers.
+Es gibt keinen Server und keine Cloud. Aufnahmen, Nachfragen und Log liegen in der IndexedDB deines Browsers.
 
 ## Benutzung
 
-1. Öffne die Seite auf dem Handy und füge sie zum Home-Bildschirm hinzu (iOS: Teilen › Zum Home-Bildschirm).
-2. Wähle unter **Audio** optional eine Inkubations-Datei und eine Frage-Datei (WAV, MP3, M4A …). Ohne Frage-Datei wird der Fragetext vorgelesen.
-3. Häng das Handy ans Ladekabel, setz die Kopfhörer auf und leg dich hin.
-4. Tippe auf **Start** und erlaube Bewegungssensor und Mikrofon.
-5. Halte das Handy locker, zum Beispiel senkrecht mit aufgestütztem Unterarm. In den ersten Sekunden wird die Halte-Lage kalibriert.
-6. Die Aufnahmen findest du danach unten in der App. Du kannst sie dort anhören oder herunterladen.
+1. Öffne die Seite auf dem Handy und füge sie zum Home-Bildschirm hinzu.
+2. **Einmalig:** Trag die Nachfragen ein (eine pro Zeile) und tippe auf **Nachfragen vertonen**. Beim ersten Mal lädt das Handy das Sprachmodell, rund 180 MB von Hugging Face, am besten im WLAN. Danach bleibt es im Browser-Cache. Mit **Probe hören** testest du Stimme und Lebendigkeit.
+3. Setz die Kopfhörer auf, häng das Handy ans Ladekabel und tippe auf **Start**. Der Bildschirm wird schwarz und ignoriert Berührungen.
+4. Zum Beenden ziehst du den Punkt unten links in den Kreis oben rechts und tippst auf **Stopp & speichern**.
 
-## Ablauf einer Runde
+Bricht eine Session ab, weil der Akku leer ist oder die App geschlossen wurde, setzt die App die bis dahin gespeicherten Abschnitte beim nächsten Öffnen zu einer Aufnahme zusammen.
 
-```
-Inkubation → Kalibrieren → Wachen ──(Handy kippt > 40° für 1,5 s)──▶ Warten (30 s)
-      ▲                                                                  │
-      │                                    hält man das Handy wieder richtig: abbrechen
-      │                                                                  ▼
- Handy aufnehmen & ruhig halten ◀── Pause ◀── Aufnahme (60 s) ◀── Frage abspielen
-```
+## Einstellungen
 
-Vor der Frage spielt standardmäßig ein sanfter Glockenton, danach wird die Frage langsam eingeblendet (beides abschaltbar unter **Audio**). Alle Zeiten und Schwellen lassen sich unter **Ablauf** und **Erkennung** einstellen. Mit **Test-Auslösung** kannst du den Ablauf ausprobieren, ohne einzuschlafen. Der **Sicherheits-Timer** löst nach X Minuten auch ohne Erkennung aus.
+| | Standard |
+|---|---|
+| Stille entfernen ab | 5 s |
+| Nachfragen nach Stille von | 5 min |
+| Höchstens Nachfragen pro Session | 6 |
+| Reihenfolge | der Reihe nach |
+| Empfindlichkeit | 12 dB über dem Grundrauschen |
+| Glockenton vor der Nachfrage | an |
+
+Der Pegelbalken zeigt den aktuellen Pegel, das Grundrauschen (grau) und die Schwelle (weiß). Wird Rauschen fälschlich als Sprache erkannt, stell die Empfindlichkeit höher. Wird leises Sprechen verpasst, stell sie niedriger.
 
 ## Wichtige Einschränkungen
 
-- **Die App muss im Vordergrund und der Bildschirm an bleiben.** Browser pausieren Sensoren, sobald das Display gesperrt ist. Die App hält den Bildschirm über die Wake Lock API wach. Die **Sperre** macht ihn schwarz und schluckt alle Berührungen. Entsperren: den Punkt unten links in den Kreis oben rechts ziehen.
-- **iOS:** Bewegungssensor und Wake Lock brauchen iOS 16.4 oder neuer. Die Berechtigung für den Bewegungssensor fragt Safari beim Start ab.
-- **Bluetooth-Kopfhörer:** Sobald das Mikrofon offen ist, schalten viele Handys Bluetooth-Kopfhörer in den Headset-Modus. Die Tonqualität sinkt dann, und oft nimmt das Mikrofon der Kopfhörer auf statt das des Handys. Deshalb ist „Mikrofon die ganze Session offen halten“ standardmäßig an: So wechselt das Profil nicht mitten in der Nacht.
-- **Ohne Kopfhörer** kann iOS bei offenem Mikrofon über die Hörmuschel statt über den Lautsprecher abspielen.
-- Aufnahmen sind je nach Browser `.webm` (Android/Chrome) oder `.m4a` (iOS/Safari).
+- **Die App muss im Vordergrund bleiben**, der Bildschirm bleibt an (schwarz). Gesperrte Bildschirme pausieren das Mikrofon.
+- **Bluetooth-Kopfhörer** schalten bei offenem Mikrofon oft in den Headset-Modus. Der Klang wird schlechter, und meist nimmt das Mikrofon der Kopfhörer auf.
+- **Speicher:** Die Aufnahme ist WAV mit 16 kHz, also etwa 2 MB pro Minute *gesprochener* Zeit. Stille kostet nichts.
+- Pocket TTS läuft auf GitHub Pages in einem einzelnen Thread, weil dort die nötigen Server-Header fehlen. Die Vertonung von sechs Fragen dauert auf einem Handy etwa eine halbe bis zwei Minuten.
 
-## Veröffentlichen mit GitHub Pages
-
-Das Repo enthält nur statische Dateien und braucht keinen Build. Unter *Settings › Pages › Deploy from a branch* den Branch `main` und den Ordner `/ (root)` wählen. Sensoren und Mikrofon brauchen HTTPS, das bringt GitHub Pages mit.
-
-Nach Änderungen die Versionsnummer `CACHE` in `sw.js` erhöhen, damit installierte Apps die neue Version laden.
-
-## Dateien
+## Technik
 
 | Datei | Inhalt |
 |---|---|
-| `index.html`, `style.css` | Oberfläche |
-| `app.js` | Ablauf, Audio, Aufnahme, Wake Lock, UI |
-| `detector.js` | Einschlaf-Erkennung (reine Logik, ohne DOM) |
-| `db.js` | IndexedDB-Speicher |
-| `sw.js`, `manifest.webmanifest` | Offline-Fähigkeit und Installation |
-| `test/detector.test.mjs` | Tests der Erkennung mit synthetischen Sensordaten |
+| `app.js` | Ablauf, Aufnahme, Nachfragen, Oberfläche |
+| `audio-core.js` | Resampling, Sprach-Erkennung (VAD), Stille-Entfernung, WAV (ohne DOM, getestet) |
+| `capture-worklet.js` | AudioWorklet für das Mikrofon |
+| `tts.js` | Pocket TTS im Browser |
+| `db.js` | IndexedDB |
+| `vendor/` | gebündeltes [pocket-tts-onnx](https://github.com/thewh1teagle/pocket-tts-onnx) (CC BY 4.0) und [onnxruntime-web](https://github.com/microsoft/onnxruntime) (MIT) |
+| `test/audio-core.test.mjs` | Tests mit synthetischem Audio |
 
-Tests ausführen (Node 18+):
+Tests (Node 18+):
 
 ```
-node --experimental-default-type=module test/detector.test.mjs
+node --experimental-default-type=module test/audio-core.test.mjs
 ```
+
+`vendor/` neu bauen:
+
+```
+npm i pocket-tts-onnx esbuild
+npx esbuild node_modules/pocket-tts-onnx/dist/browser.js --bundle --format=esm --platform=browser --minify --outfile=vendor/pocket-tts.js
+npx esbuild node_modules/pocket-tts-onnx/dist/worker.js --bundle --format=esm --platform=browser --minify \
+  --external:module --external:fs --external:path --external:url --external:worker_threads --outfile=vendor/pocket-tts-worker.js
+cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.{mjs,wasm} vendor/ort/
+```
+
+Nach Änderungen die Versionsnummer `CACHE` in `sw.js` erhöhen.
+
+Die frühere Version mit Einschlaf-Erkennung über den Bewegungssensor steht in der Git-Historie (Commit `a29893a`).
 
 ## Hinweis
 
-Das ist ein Experimentier-Werkzeug, kein Medizinprodukt. Häufiges Wecken in der Einschlafphase kann den Schlaf stören. Benutz die App deshalb eher für Nickerchen oder einzelne Sessions und nicht jede Nacht.
+Das ist ein Experimentier-Werkzeug, kein Medizinprodukt.
