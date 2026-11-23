@@ -1,6 +1,6 @@
 // Service Worker: macht die App offline-fähig und installierbar.
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = 'hypna-app-v6';
+const CACHE = 'hypna-app-v7';
 // Eigene Caches, die Updates überleben (nur bei Änderungen an vendor/ erhöhen)
 const VENDOR_CACHE = 'hypna-vendor-v1';
 const HF_JSON_CACHE = 'hypna-hf-json';

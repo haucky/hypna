@@ -1,5 +1,8 @@
-// IndexedDB: Nachfragen-Audios, Aufnahme-Abschnitte (Absturzsicherung), fertige Aufnahmen, Log.
-// Alles bleibt lokal im Browser.
+// IndexedDB: Nachfragen-Audios, Stimmprobe, Aufnahme-Abschnitte (Absturzsicherung),
+// fertige Aufnahmen, Log. Alles bleibt lokal im Browser.
+//
+// Android-Chrome schließt Datenbankverbindungen, wenn die App im Hintergrund war
+// oder eingefroren wurde. Deshalb wird die Verbindung bei Bedarf neu geöffnet.
 const DB_NAME = 'hypna';
 const DB_VERSION = 2;
 let dbPromise = null;
@@ -20,17 +23,46 @@ function open() {
           s.createIndex('session', 'session');
         }
       };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const d = req.result;
+        // Vom Browser geschlossen: beim nächsten Zugriff neu verbinden
+        d.onclose = () => { if (dbPromise && dbPromise._db === d) dbPromise = null; };
+        d.onversionchange = () => {
+          d.close();
+          if (dbPromise && dbPromise._db === d) dbPromise = null;
+        };
+        dbPromise._db = d;
+        resolve(d);
+      };
+      req.onerror = () => {
+        dbPromise = null;
+        reject(req.error);
+      };
+      req.onblocked = () => console.warn('[hypna] Datenbank blockiert – ist die App in einem anderen Tab offen?');
     });
   }
   return dbPromise;
 }
 
+// Transaktion öffnen; ist die Verbindung inzwischen zu, einmal neu verbinden.
+async function transaction(stores, mode) {
+  for (let attempt = 0; ; attempt++) {
+    const d = await open();
+    try {
+      return d.transaction(stores, mode);
+    } catch (e) {
+      if (attempt === 0 && e && e.name === 'InvalidStateError') {
+        dbPromise = null;
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 async function run(store, mode, fn) {
-  const d = await open();
+  const tx = await transaction(store, mode);
   return new Promise((resolve, reject) => {
-    const tx = d.transaction(store, mode);
     const req = fn(tx.objectStore(store));
     tx.oncomplete = () => resolve(req ? req.result : undefined);
     tx.onerror = () => reject(tx.error);
@@ -53,12 +85,12 @@ export const clearEvents = () => run('events', 'readwrite', (s) => s.clear());
 export const addChunk = (c) => run('chunks', 'readwrite', (s) => s.add(c));
 export const listChunks = (session) =>
   run('chunks', 'readonly', (s) => s.index('session').getAll(session));
+
 // Alle Sessions, von denen noch unverarbeitete Abschnitte da sind (ohne die Audiodaten zu laden)
 export async function listAllChunkSessions() {
-  const d = await open();
+  const tx = await transaction('chunks', 'readonly');
   return new Promise((resolve, reject) => {
     const out = [];
-    const tx = d.transaction('chunks', 'readonly');
     const req = tx.objectStore('chunks').index('session').openKeyCursor(null, 'nextunique');
     req.onsuccess = () => {
       const c = req.result;
@@ -71,12 +103,11 @@ export async function listAllChunkSessions() {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 export async function deleteChunks(session) {
-  const d = await open();
+  const tx = await transaction('chunks', 'readwrite');
   return new Promise((resolve, reject) => {
-    const tx = d.transaction('chunks', 'readwrite');
-    const idx = tx.objectStore('chunks').index('session');
-    const req = idx.openCursor(IDBKeyRange.only(session));
+    const req = tx.objectStore('chunks').index('session').openCursor(IDBKeyRange.only(session));
     req.onsuccess = () => {
       const c = req.result;
       if (c) {
@@ -87,4 +118,10 @@ export async function deleteChunks(session) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// Nur für Tests: Verbindung schließen, ohne es dem Modul zu sagen (wie Android es tut)
+export async function _simulateBrowserClose() {
+  const d = await open();
+  d.close();
 }
