@@ -5,7 +5,37 @@ import { normalize, floatToInt16, wavHeader } from './audio-core.js';
 
 let enginePromise = null;
 
+// Name des Caches, in dem pocket-tts-onnx die Modelldateien ablegt
+const MODEL_CACHE_PREFIX = 'pocket-tts-models';
+
+// Was liegt lokal? { files, bytes, persisted, quota, usage }
+export async function modelCacheInfo() {
+  const info = { files: 0, bytes: 0, persisted: false, quota: 0, usage: 0 };
+  try {
+    for (const name of await caches.keys()) {
+      if (!name.startsWith(MODEL_CACHE_PREFIX)) continue;
+      const cache = await caches.open(name);
+      for (const req of await cache.keys()) {
+        const res = await cache.match(req);
+        info.files++;
+        info.bytes += Number(res?.headers.get('content-length') || 0);
+      }
+    }
+  } catch { /* kein Cache API */ }
+  try {
+    if (navigator.storage?.persisted) info.persisted = await navigator.storage.persisted();
+    if (navigator.storage?.estimate) Object.assign(info, await navigator.storage.estimate());
+  } catch { /* ignore */ }
+  return info;
+}
+
+export async function clearModelCache() {
+  for (const name of await caches.keys()) if (name.startsWith(MODEL_CACHE_PREFIX)) await caches.delete(name);
+}
+
 export function loadEngine(onProgress) {
+  // Dauerhaften Speicher anfragen, damit der Browser das Modell nicht von selbst löscht
+  try { navigator.storage?.persist?.(); } catch { /* ignore */ }
   if (!enginePromise) {
     enginePromise = import('./vendor/pocket-tts.js')
       .then(({ Engine }) =>

@@ -1,6 +1,6 @@
 import { RATE, FRAME, Resampler, Framer, Vad, Segmenter, floatToInt16, wavHeader, assembleWavParts } from './audio-core.js';
 import * as db from './db.js';
-import { loadEngine, disposeEngine, synthesize, cloneVoice } from './tts.js';
+import { loadEngine, disposeEngine, synthesize, cloneVoice, modelCacheInfo, clearModelCache } from './tts.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -217,12 +217,28 @@ function setProgress(frac, text) {
   if (text != null) $('#ttsStatus').textContent = text;
 }
 
+async function renderModelInfo() {
+  const el = $('#modelInfo');
+  if (!el) return;
+  const i = await modelCacheInfo();
+  const mb = (b) => `${Math.round(b / 1e6)} MB`;
+  if (i.bytes > 50e6) {
+    el.textContent = `Sprachmodell lokal gespeichert (${mb(i.bytes)})${i.persisted ? ', dauerhaft' : ''}.`;
+    $('#btnModelDel').hidden = false;
+  } else {
+    el.textContent = 'Sprachmodell noch nicht auf dem Handy – wird beim ersten Vertonen geladen (ca. 180 MB).';
+    $('#btnModelDel').hidden = true;
+  }
+  if (i.quota) el.textContent += ` Speicher: ${mb(i.usage)} von ${mb(i.quota)} belegt.`;
+}
+
 async function getEngine() {
   setProgress(0, 'Starte Pocket TTS …');
   const engine = await loadEngine((stage, p) => {
     const total = p && p.total;
     const loaded = p && p.loaded;
-    if (total) setProgress(loaded / total, `${stageLabel(stage)} … ${Math.round(loaded / 1e6)} / ${Math.round(total / 1e6)} MB`);
+    const from = p && p.cached ? ' (vom Handy)' : '';
+    if (total) setProgress(loaded / total, `${stageLabel(stage)}${from} … ${Math.round(loaded / 1e6)} / ${Math.round(total / 1e6)} MB`);
     else setProgress(null, `${stageLabel(stage)} …`);
   });
   fillVoices(engine);
@@ -322,6 +338,11 @@ async function generatePrompts({ onlyFirst = false } = {}) {
   } finally {
     // Modell freigeben: nachts wird es nicht gebraucht, und es belegt viel Speicher
     await disposeEngine();
+    const info = await modelCacheInfo();
+    if (info.bytes < 50e6 && !$('#warn').textContent.startsWith('Vertonung fehlgeschlagen')) {
+      showWarn('Das Sprachmodell konnte nicht auf dem Handy gespeichert werden (zu wenig Speicher oder privater Modus). Es wird beim nächsten Mal erneut geladen.');
+    }
+    renderModelInfo();
     generating = false;
     $('#btnGenerate').disabled = false;
     $('#btnTry').disabled = false;
@@ -507,6 +528,13 @@ function bindPrompts() {
     saveSettings();
   });
   $('#btnGenerate').addEventListener('click', () => generatePrompts());
+  $('#btnModelDel').addEventListener('click', async () => {
+    if (!confirmDelete()) return;
+    await clearModelCache();
+    log('Sprachmodell vom Handy gelöscht');
+    renderModelInfo();
+  });
+  renderModelInfo();
   $('#btnTry').addEventListener('click', () => generatePrompts({ onlyFirst: true }));
   restoreVoiceList();
   renderPromptList();
