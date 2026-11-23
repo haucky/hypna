@@ -32,7 +32,32 @@ export async function disposeEngine() {
   enginePromise = null;
 }
 
+// Bringt Audio auf eine andere Abtastrate (über OfflineAudioContext, hohe Qualität).
+export async function resampleTo(pcm, fromRate, toRate) {
+  if (fromRate === toRate) return pcm;
+  const len = Math.ceil((pcm.length * toRate) / fromRate);
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new OAC(1, len, toRate);
+  const buf = ctx.createBuffer(1, pcm.length, fromRate);
+  buf.copyToChannel(pcm, 0);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+  const out = await ctx.startRendering();
+  return out.getChannelData(0).slice();
+}
+
+// Klont eine Stimme aus einer Aufnahme. Der Worker behält die Stimme, bis er beendet wird.
+// Rückgabe: ein Float32Array, das als `voice` an synthesize übergeben wird.
+export async function cloneVoice(engine, pcm, rate, onProgress) {
+  const samples = await resampleTo(pcm, rate, engine.sampleRate);
+  await engine.clone(samples.subarray(0, engine.sampleRate * 20), onProgress);
+  return samples; // Platzhalter: der Worker setzt dafür die geklonte Stimme ein
+}
+
 // Erzeugt einen Satz als WAV-Blob (mit kurzer Stille vorn und hinten).
+// voice: Name einer eingebauten Stimme oder das Ergebnis von cloneVoice.
 export async function synthesize(engine, text, voice, { temperature } = {}) {
   const frames = [];
   const opts = {};

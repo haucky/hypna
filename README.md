@@ -18,6 +18,12 @@ Es gibt keinen Server und keine Cloud. Aufnahmen, Nachfragen und Log liegen in d
 
 Bricht eine Session ab, weil der Akku leer ist oder die App geschlossen wurde, setzt die App die bis dahin gespeicherten Abschnitte beim nächsten Öffnen zu einer Aufnahme zusammen.
 
+## Eigene Stimme
+
+Unter **Nachfragen › Eigene Stimme** liest du einen vorgegebenen Text vor (10–20 s) oder wählst eine Audiodatei. Pocket TTS klont daraus die Stimme, und die Nachfragen klingen dann wie du. Sprich so, wie die Fragen später klingen sollen, also ruhig und eher leise. Beim ersten Klonen lädt die App zusätzlich den Stimmen-Encoder (ca. 40 MB). Die Stimmprobe bleibt lokal gespeichert, geklont wird bei jedem Vertonen neu.
+
+Klone nur deine eigene Stimme oder eine, für die du die Erlaubnis hast.
+
 ## Einstellungen
 
 | | Standard |

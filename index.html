@@ -61,6 +61,19 @@
           <input type="range" id="tempRange" min="0.1" max="1" step="0.05">
         </label>
       </div>
+      <details class="clone" id="cloneBox">
+        <summary><strong>Eigene Stimme</strong> <span class="muted" id="cloneSummary"></span></summary>
+        <p class="muted">Lies diesen Text ruhig und eher leise vor, so wie die Nachfragen später klingen sollen. 10–20 Sekunden reichen. Am besten in einem stillen Raum, Handy etwa 20 cm vor dem Mund.</p>
+        <blockquote class="read-text" id="cloneText">Ich liege ruhig da und lasse los. Mein Atem kommt und geht, ganz von selbst. Gedanken tauchen auf, ziehen vorbei, und ich schaue einfach zu. Was ist gerade da? Ein Bild, ein Gefühl, eine leise Stimme. Ich muss nichts festhalten. Alles darf sein, so wie es ist.</blockquote>
+        <div class="buttons">
+          <button id="btnCloneRec" class="primary">● Aufnehmen</button>
+          <button id="btnClonePlay" disabled>▶︎ Anhören</button>
+          <label class="btn">Datei<input type="file" id="cloneFile" accept="audio/*,.opus,.ogg,.m4a,.mp3,.wav" hidden></label>
+          <button id="btnCloneDel" disabled>✕</button>
+        </div>
+        <p class="muted" id="cloneStatus"></p>
+        <p class="muted small-print">Klone nur deine eigene Stimme oder eine, für die du die Erlaubnis hast. Die Aufnahme bleibt auf deinem Handy.</p>
+      </details>
       <div class="buttons">
         <button id="btnGenerate" class="primary">Nachfragen vertonen</button>
         <button id="btnTry">Probe hören</button>

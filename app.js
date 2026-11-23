@@ -1,6 +1,6 @@
-import { RATE, FRAME, Resampler, Framer, Vad, Segmenter, floatToInt16, assembleWavParts } from './audio-core.js';
+import { RATE, FRAME, Resampler, Framer, Vad, Segmenter, floatToInt16, wavHeader, assembleWavParts } from './audio-core.js';
 import * as db from './db.js';
-import { loadEngine, disposeEngine, synthesize } from './tts.js';
+import { loadEngine, disposeEngine, synthesize, cloneVoice } from './tts.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -229,27 +229,36 @@ async function getEngine() {
   return engine;
 }
 
+const CLONE = '__clone__';
+
 function fillVoices(engine) {
   const sel = $('#voiceSelect');
   const voices = engine.voices || [];
   sel.innerHTML = '';
+  if (hasCloneSample) {
+    const o = document.createElement('option');
+    o.value = CLONE;
+    o.textContent = 'Meine Stimme';
+    sel.append(o);
+  }
   for (const v of voices) {
     const o = document.createElement('option');
     o.value = v;
     o.textContent = v === engine.defaultVoice ? `${v} (Standard)` : v;
     sel.append(o);
   }
-  if (!settings.voice || !voices.includes(settings.voice)) settings.voice = engine.defaultVoice || voices[0] || '';
-  sel.value = settings.voice;
+  const valid = voices.includes(settings.voice) || (settings.voice === CLONE && hasCloneSample);
+  // „Meine Stimme“ nicht überschreiben, solange die Stimmprobe noch geladen wird
+  if (!valid && settings.voice !== CLONE) settings.voice = engine.defaultVoice || voices[0] || '';
+  sel.value = valid ? settings.voice : engine.defaultVoice || voices[0] || '';
   try { localStorage.setItem('hypna.voices', JSON.stringify({ voices, def: engine.defaultVoice })); } catch { /* ignore */ }
   saveSettings();
 }
 
 function restoreVoiceList() {
-  try {
-    const v = JSON.parse(localStorage.getItem('hypna.voices') || 'null');
-    if (v) fillVoices({ voices: v.voices, defaultVoice: v.def });
-  } catch { /* ignore */ }
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem('hypna.voices') || 'null'); } catch { /* ignore */ }
+  fillVoices(v ? { voices: v.voices, defaultVoice: v.def } : { voices: ['juergen', 'alba'], defaultVoice: 'juergen' });
 }
 
 let generating = false;
@@ -263,7 +272,19 @@ async function generatePrompts({ onlyFirst = false } = {}) {
   hideWarn();
   try {
     const engine = await getEngine();
-    const voice = settings.voice || engine.defaultVoice;
+    let voice = settings.voice || engine.defaultVoice;
+    let voiceKey = voice;
+    let voiceLabel = voice;
+    if (voice === CLONE) {
+      const sample = await db.getFile(CLONE_KEY);
+      if (!sample) throw new Error('Keine Aufnahme deiner Stimme gespeichert');
+      setProgress(0, 'Klone deine Stimme …');
+      voice = await cloneVoice(engine, new Float32Array(sample.pcm), sample.rate, (stage, p) => {
+        if (p && p.total) setProgress(p.loaded / p.total, `Lade Stimmen-Encoder … ${Math.round(p.loaded / 1e6)} / ${Math.round(p.total / 1e6)} MB`);
+      });
+      voiceKey = `${CLONE}:${sample.createdAt}`;
+      voiceLabel = 'meine Stimme';
+    }
     if (onlyFirst) {
       setProgress(null, 'Erzeuge Probe …');
       const t0 = performance.now();
@@ -274,7 +295,7 @@ async function generatePrompts({ onlyFirst = false } = {}) {
     }
     const old = await getPromptSet();
     const reuse = new Map(
-      (old?.items || []).filter((it) => it.voice === voice && it.temperature === settings.temperature).map((it) => [it.text, it])
+      (old?.items || []).filter((it) => (it.voiceKey || it.voice) === voiceKey && it.temperature === settings.temperature).map((it) => [it.text, it])
     );
     const items = [];
     const t0 = performance.now();
@@ -287,7 +308,7 @@ async function generatePrompts({ onlyFirst = false } = {}) {
         continue;
       }
       const blob = await synthesize(engine, text, voice, { temperature: settings.temperature });
-      items.push({ text, voice, temperature: settings.temperature, blob });
+      items.push({ text, voice: voiceLabel, voiceKey, temperature: settings.temperature, blob });
     }
     await db.putFile(PROMPTS_KEY, { createdAt: Date.now(), items });
     setProgress(null);
@@ -305,6 +326,165 @@ async function generatePrompts({ onlyFirst = false } = {}) {
     $('#btnGenerate').disabled = false;
     $('#btnTry').disabled = false;
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Eigene Stimme: Hörprobe aufnehmen oder Datei wählen
+// ---------------------------------------------------------------------------
+const CLONE_KEY = 'cloneSample';
+let hasCloneSample = false;
+const cloneRec = { ctx: null, stream: null, node: null, blocks: [], startedAt: 0, timer: null };
+
+function trimSilence(pcm, rate) {
+  const frame = Math.round(rate * 0.02);
+  let peakDb = -100;
+  const dbs = [];
+  for (let i = 0; i + frame <= pcm.length; i += frame) {
+    let s = 0;
+    for (let j = i; j < i + frame; j++) s += pcm[j] * pcm[j];
+    const db = 10 * Math.log10(s / frame + 1e-12);
+    dbs.push(db);
+    peakDb = Math.max(peakDb, db);
+  }
+  const thr = peakDb - 35;
+  let a = dbs.findIndex((d) => d > thr);
+  let b = dbs.length - 1 - [...dbs].reverse().findIndex((d) => d > thr);
+  if (a < 0) return pcm;
+  const margin = 10; // 0,2 s
+  a = Math.max(0, a - margin) * frame;
+  b = Math.min(dbs.length, b + margin + 1) * frame;
+  return pcm.slice(a, Math.min(pcm.length, b, a + rate * 20));
+}
+
+async function saveCloneSample(pcm, rate, source) {
+  const trimmed = trimSilence(pcm, rate);
+  const sec = trimmed.length / rate;
+  if (sec < 3) throw new Error(`Die Aufnahme ist zu kurz (${sec.toFixed(1)} s). Bitte mindestens 5–10 Sekunden sprechen.`);
+  await db.putFile(CLONE_KEY, { createdAt: Date.now(), rate, pcm: trimmed.buffer, seconds: sec, source });
+  settings.voice = CLONE;
+  saveSettings();
+  log(`Stimmprobe gespeichert (${sec.toFixed(1)} s, ${source})`);
+  await refreshClone();
+}
+
+async function refreshClone() {
+  let sample = null;
+  try { sample = await db.getFile(CLONE_KEY); } catch { /* ignore */ }
+  hasCloneSample = !!sample;
+  $('#btnClonePlay').disabled = !sample;
+  $('#btnCloneDel').disabled = !sample;
+  $('#cloneSummary').textContent = sample ? `${sample.seconds.toFixed(0)} s gespeichert` : 'noch keine Aufnahme';
+  $('#cloneStatus').textContent = sample
+    ? `Gespeichert: ${sample.seconds.toFixed(1)} s. „Meine Stimme“ ist ausgewählt – tippe auf „Probe hören“.`
+    : '';
+  restoreVoiceList();
+  renderPromptList();
+}
+
+async function startCloneRecording() {
+  hideWarn();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  cloneRec.ctx = new Ctx();
+  await cloneRec.ctx.resume();
+  cloneRec.stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+  });
+  await cloneRec.ctx.audioWorklet.addModule('./capture-worklet.js');
+  const src = cloneRec.ctx.createMediaStreamSource(cloneRec.stream);
+  cloneRec.node = new AudioWorkletNode(cloneRec.ctx, 'capture');
+  const sink = cloneRec.ctx.createGain();
+  sink.gain.value = 0;
+  src.connect(cloneRec.node);
+  cloneRec.node.connect(sink);
+  sink.connect(cloneRec.ctx.destination);
+  cloneRec.blocks = [];
+  cloneRec.node.port.onmessage = (e) => cloneRec.blocks.push(e.data);
+  cloneRec.startedAt = Date.now();
+  const btn = $('#btnCloneRec');
+  btn.textContent = '■ Stopp';
+  btn.classList.add('recording');
+  cloneRec.timer = setInterval(() => {
+    const s = (Date.now() - cloneRec.startedAt) / 1000;
+    $('#cloneStatus').textContent = `Aufnahme läuft … ${s.toFixed(0)} s (bis 20 s)`;
+    if (s >= 22) stopCloneRecording();
+  }, 250);
+}
+
+async function stopCloneRecording() {
+  clearInterval(cloneRec.timer);
+  const btn = $('#btnCloneRec');
+  btn.textContent = '● Aufnehmen';
+  btn.classList.remove('recording');
+  if (!cloneRec.ctx) return;
+  const rate = cloneRec.ctx.sampleRate;
+  cloneRec.node.port.onmessage = null;
+  cloneRec.stream.getTracks().forEach((t) => t.stop());
+  await cloneRec.ctx.close().catch(() => {});
+  cloneRec.ctx = null;
+  const n = cloneRec.blocks.reduce((a, b) => a + b.length, 0);
+  const pcm = new Float32Array(n);
+  let o = 0;
+  for (const b of cloneRec.blocks) { pcm.set(b, o); o += b.length; }
+  cloneRec.blocks = [];
+  try {
+    await saveCloneSample(pcm, rate, 'Aufnahme');
+  } catch (e) {
+    showWarn(e.message);
+    $('#cloneStatus').textContent = '';
+  }
+}
+
+function bindClone() {
+  $('#btnCloneRec').addEventListener('click', async () => {
+    if (running()) return showWarn('Während einer Session kann nicht aufgenommen werden.');
+    try {
+      if (cloneRec.ctx) await stopCloneRecording();
+      else await startCloneRecording();
+    } catch (e) {
+      showWarn(`Aufnahme nicht möglich: ${e.message}`);
+      clearInterval(cloneRec.timer);
+      cloneRec.ctx = null;
+    }
+  });
+  $('#btnClonePlay').addEventListener('click', async () => {
+    const s = await db.getFile(CLONE_KEY);
+    if (!s) return;
+    const pcm = floatToInt16(new Float32Array(s.pcm));
+    playPreview(new Blob([wavHeader(pcm.byteLength, s.rate), pcm], { type: 'audio/wav' }));
+  });
+  $('#btnCloneDel').addEventListener('click', async () => {
+    if (!confirmDelete()) return;
+    await db.deleteFile(CLONE_KEY);
+    if (settings.voice === CLONE) { settings.voice = ''; saveSettings(); }
+    log('Stimmprobe gelöscht');
+    refreshClone();
+  });
+  $('#cloneFile').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const buf = await new Promise(async (res, rej) => {
+        const data = await file.arrayBuffer();
+        const p = ctx.decodeAudioData(data, res, rej);
+        if (p && p.then) p.then(res, rej);
+      });
+      ctx.close().catch(() => {});
+      // Mono mischen
+      const pcm = new Float32Array(buf.length);
+      for (let c = 0; c < buf.numberOfChannels; c++) {
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < d.length; i++) pcm[i] += d[i] / buf.numberOfChannels;
+      }
+      await saveCloneSample(pcm, buf.sampleRate, file.name);
+    } catch (err) {
+      showWarn(`Datei konnte nicht gelesen werden: ${err.message || err}`);
+    }
+  });
+  refreshClone();
 }
 
 function bindPrompts() {
@@ -827,6 +1007,7 @@ function confirmDelete() {
 function init() {
   bindSettings();
   bindPrompts();
+  bindClone();
   bindNight();
   renderRecordings();
   loadLog();
