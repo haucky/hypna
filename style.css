@@ -286,3 +286,4 @@ select {
 #btnCloneRec.recording { background: var(--danger); border-color: var(--danger); }
 .model-info { margin-top: 10px; }
 .model-info button { margin-left: 6px; }
+.error { color: var(--danger); font-weight: 600; }

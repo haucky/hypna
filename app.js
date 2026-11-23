@@ -217,6 +217,17 @@ function setProgress(frac, text) {
   if (text != null) $('#ttsStatus').textContent = text;
 }
 
+function explainTtsError(msg) {
+  const m = msg.toLowerCase();
+  if (m.includes('fetch') || m.includes('network') || m.includes('404') || m.includes('403'))
+    return 'Das Modell konnte nicht geladen werden. Ist das Handy online?';
+  if (m.includes('encoder')) return 'Für diese Sprache fehlt der Stimmen-Encoder – Klonen geht damit nicht. Wähle eine eingebaute Stimme.';
+  if (m.includes('memory') || m.includes('allocation') || m.includes('out of'))
+    return 'Zu wenig Arbeitsspeicher. Schließ andere Apps und Tabs und versuch es noch einmal.';
+  if (m.includes('stimmprobe') || m.includes('keine aufnahme')) return '';
+  return 'Schick mir diese Meldung, dann schaue ich es mir an.';
+}
+
 async function renderModelInfo() {
   const el = $('#modelInfo');
   if (!el) return;
@@ -331,15 +342,22 @@ async function generatePrompts({ onlyFirst = false } = {}) {
     log(`${items.length} Nachfragen vertont (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
     await renderPromptList();
   } catch (e) {
-    setProgress(null, '');
-    renderPromptList();
-    showWarn(`Vertonung fehlgeschlagen: ${e.message || e}. Ist das Handy online? Beim ersten Mal wird das Modell geladen.`);
-    log(`TTS-Fehler: ${e.message || e}`);
+    setProgress(null);
+    const msg = e && e.message ? e.message : String(e);
+    log(`TTS-Fehler: ${msg}`);
+    await renderPromptList();
+    // Fehler direkt unter dem Knopf zeigen, nicht nur oben in der Statuskarte
+    const st = $('#ttsStatus');
+    st.innerHTML = '';
+    const b = document.createElement('span');
+    b.className = 'error';
+    b.textContent = `Fehler: ${msg}`;
+    st.append(b, document.createTextNode(' ' + explainTtsError(msg)));
   } finally {
     // Modell freigeben: nachts wird es nicht gebraucht, und es belegt viel Speicher
     await disposeEngine();
     const info = await modelCacheInfo();
-    if (info.bytes < 50e6 && !$('#warn').textContent.startsWith('Vertonung fehlgeschlagen')) {
+    if (info.bytes < 50e6 && !$('#ttsStatus .error')) {
       showWarn('Das Sprachmodell konnte nicht auf dem Handy gespeichert werden (zu wenig Speicher oder privater Modus). Es wird beim nächsten Mal erneut geladen.');
     }
     renderModelInfo();
@@ -395,6 +413,7 @@ async function refreshClone() {
   hasCloneSample = !!sample;
   $('#btnClonePlay').disabled = !sample;
   $('#btnCloneDel').disabled = !sample;
+  $('#btnCloneDl').disabled = !sample;
   $('#cloneSummary').textContent = sample ? `${sample.seconds.toFixed(0)} s gespeichert` : 'noch keine Aufnahme';
   $('#cloneStatus').textContent = sample
     ? `Gespeichert: ${sample.seconds.toFixed(1)} s. „Meine Stimme“ ist ausgewählt – tippe auf „Probe hören“.`
@@ -473,6 +492,19 @@ function bindClone() {
     if (!s) return;
     const pcm = floatToInt16(new Float32Array(s.pcm));
     playPreview(new Blob([wavHeader(pcm.byteLength, s.rate), pcm], { type: 'audio/wav' }));
+  });
+  $('#btnCloneDl').addEventListener('click', async () => {
+    const s = await db.getFile(CLONE_KEY);
+    if (!s) return;
+    const pcm = floatToInt16(new Float32Array(s.pcm));
+    const blob = new Blob([wavHeader(pcm.byteLength, s.rate), pcm], { type: 'audio/wav' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `stimmprobe_${fileStamp(s.createdAt)}.wav`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   });
   $('#btnCloneDel').addEventListener('click', async () => {
     if (!confirmDelete()) return;
